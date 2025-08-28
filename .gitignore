@@ -1,6 +1,6 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 *.egg-info/
@@ -15,8 +15,9 @@ Thumbs.db
 .vscode/
 .idea/
 # Data/outputs
+record_*.txt
 *.csv
-*.txt
+*.json
 *.log
 # Matplotlib cache
 .matplotlib/

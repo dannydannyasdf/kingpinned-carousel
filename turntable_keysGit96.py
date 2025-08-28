@@ -36,6 +36,8 @@ Dependencies:
 - clickhouse-client in PATH (password via CH_PASSWORD env var; default 'asdf').
 """
 
+__version__ = "0.1.0"
+
 import os
 import sys
 import time
@@ -56,12 +58,21 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 # =========================
 CH_PASSWORD = os.environ.get('CH_PASSWORD', 'asdf')
 CH_CLIENT = shutil.which("clickhouse-client")
-if CH_CLIENT is None:
-    print("Error: clickhouse-client not found in PATH. Please install or add to PATH.")
-    sys.exit(1)
+CLICKHOUSE_AVAILABLE = CH_CLIENT is not None
+
+if not CLICKHOUSE_AVAILABLE:
+    print("Warning: clickhouse-client not found in PATH. ClickHouse features will be disabled.")
+    print("To install on Ubuntu/Debian: sudo apt-get install clickhouse-client")
+
+if not os.environ.get('CH_PASSWORD'):
+    print("Warning: CH_PASSWORD environment variable not set. Using default 'asdf'.")
+    print("To set your password: export CH_PASSWORD='your_password_here'")
 
 
 def run_clickhouse(query: str, fmt: str | None = None, timeout: int = 20) -> str:
+    if not CLICKHOUSE_AVAILABLE:
+        raise RuntimeError("ClickHouse client not available")
+    
     env = os.environ.copy()
     env["CH_PASSWORD"] = CH_PASSWORD
     cmd = [CH_CLIENT, "--password", CH_PASSWORD, "--query", query]
@@ -80,17 +91,23 @@ def run_clickhouse(query: str, fmt: str | None = None, timeout: int = 20) -> str
 
 
 def run_clickhouse_json(query: str, timeout: int = 20) -> list[dict]:
-    out = run_clickhouse(query, fmt="JSONEachRow", timeout=timeout)
-    rows: list[dict] = []
-    for line in out.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            rows.append(json.loads(line))
-        except json.JSONDecodeError:
-            pass
-    return rows
+    if not CLICKHOUSE_AVAILABLE:
+        return []
+    
+    try:
+        out = run_clickhouse(query, fmt="JSONEachRow", timeout=timeout)
+        rows: list[dict] = []
+        for line in out.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+        return rows
+    except RuntimeError:
+        return []
 
 
 # =========================
@@ -1808,10 +1825,16 @@ LIMIT 100
 # Entry point
 # =========================
 def main():
-    try:
-        run_clickhouse("SELECT 1", fmt=None)
-    except Exception as e:
-        print(f"Warning: ClickHouse connectivity problem: {e}")
+    print(f"Kingpinned Carousel {__version__}")
+    
+    if CLICKHOUSE_AVAILABLE:
+        try:
+            run_clickhouse("SELECT 1", fmt=None)
+            print("ClickHouse connectivity: OK")
+        except Exception as e:
+            print(f"Warning: ClickHouse connectivity problem: {e}")
+    else:
+        print("ClickHouse features disabled (client not available)")
 
     nav = TurntableMatrixNavigator()
 
